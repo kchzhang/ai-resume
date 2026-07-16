@@ -268,18 +268,18 @@ async function save() {
       </section>
     </div>
 
-    <!-- 右下角操作按钮 -->
-    <div class="fixed bottom-0 left-0 right-0 flex justify-end gap-2 p-4 bg-white border-t border-slate-200">
+    <!-- 底部操作栏 -->
+    <div class="fixed bottom-0 left-0 right-0 flex items-center justify-end gap-2 h-11 px-4 bg-white border-t border-slate-200">
       <button
         @click="cancel"
-        class="h-10 px-5 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg transition-all duration-150 hover:bg-slate-200 active:scale-[0.98]"
+        class="h-7 px-3 text-sm font-medium text-slate-600 bg-slate-100 rounded-md transition-all duration-150 hover:bg-slate-200 active:scale-[0.98]"
       >
         取消
       </button>
       <button
         @click="save"
         :disabled="isSaving"
-        class="h-10 px-5 text-sm font-medium text-white bg-sky-500 rounded-lg transition-all duration-150 hover:bg-sky-600 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+        class="h-7 px-3 text-sm font-medium text-white bg-sky-500 rounded-md transition-all duration-150 hover:bg-sky-600 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {{ isSaving ? '保存中…' : '保存' }}
       </button>

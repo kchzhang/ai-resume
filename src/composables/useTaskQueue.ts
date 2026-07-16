@@ -31,7 +31,10 @@ export function useTaskQueue() {
         if (r.tasks) tasks.value = r.tasks;
         if (r.paused !== undefined) isPaused.value = r.paused;
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error('[useTaskQueue] init failed:', err);
+        initialized = false; // 允许后续调用重试
+      });
     // 订阅引擎写入的任务快照，任务推进时刷新 UI
     if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
       // 生产环境：监听 chrome.storage.onChanged

@@ -11,24 +11,27 @@ import type { RuntimeMessage, RuntimeResponse } from '@/types/runtime';
 const PAUSED_KEY = 'ai_queue_paused';
 
 const queue = new TaskQueue({ concurrency: 1, autoPersist: false });
-let initialized = false;
+let initPromise: Promise<TaskRecord[]> | null = null;
 
 async function ensureInit(): Promise<TaskRecord[]> {
-  if (!initialized) {
-    // 先恢复 paused 状态，避免 init 的 pump 在错误状态下自动续跑
-    const result = (await getStorageData(PAUSED_KEY)) as Record<string, any> | null;
-    // 兼容两种存储形态：chrome.storage.local 返回 { ai_queue_paused: {...} }，
-    // localStorage 直接返回数据本身 { paused: ... }
-    const paused = result?.paused ?? result?.ai_queue_paused?.paused;
-    if (paused) queue.pause();
+  // 并发锁：多条消息同时到达时共享同一个 init Promise，避免重复初始化
+  if (!initPromise) {
+    initPromise = (async () => {
+      // 先恢复 paused 状态，避免 init 的 pump 在错误状态下自动续跑
+      const result = (await getStorageData(PAUSED_KEY)) as Record<string, any> | null;
+      // 兼容两种存储形态：chrome.storage.local 返回 { ai_queue_paused: {...} }，
+      // localStorage 直接返回数据本身 { paused: ... }
+      const paused = result?.paused ?? result?.ai_queue_paused?.paused;
+      if (paused) queue.pause();
 
-    // 先恢复持久化任务，再订阅；否则 subscribe 的立即触发会把空列表写回 storage，
-    // 覆盖掉 ai_task_records 中已有的任务（每次引擎重启都会清空历史）
-    await queue.init();
-    queue.subscribe((list: TaskRecord[]) => void saveTaskList(list));
-    initialized = true;
+      // 先恢复持久化任务，再订阅；否则 subscribe 的立即触发会把空列表写回 storage，
+      // 覆盖掉 ai_task_records 中已有的任务（每次引擎重启都会清空历史）
+      await queue.init();
+      queue.subscribe((list: TaskRecord[]) => void saveTaskList(list));
+      return queue.getTasks();
+    })();
   }
-  return queue.getTasks();
+  return initPromise;
 }
 
 export async function handleRuntimeMessage(message: RuntimeMessage): Promise<RuntimeResponse> {

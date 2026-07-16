@@ -114,13 +114,6 @@ function goReportDetail(id: string) {
         <div class="flex items-center gap-2 shrink-0">
           <button
             v-if="stats.total > 0"
-            @click="clear('finished')"
-            class="h-8 px-3 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg transition-all duration-150 hover:bg-slate-100 active:scale-[0.98]"
-          >
-            清完成
-          </button>
-          <button
-            v-if="stats.total > 0"
             @click="clear('all')"
             class="h-8 px-3 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg transition-all duration-150 hover:bg-slate-100 active:scale-[0.98]"
           >

@@ -31,7 +31,13 @@ async function ensureInit(): Promise<TaskRecord[]> {
       return queue.getTasks();
     })();
   }
-  return initPromise;
+  try {
+    return await initPromise;
+  } catch (err) {
+    // 初始化失败时清除 Promise，允许后续消息重试
+    initPromise = null;
+    throw err;
+  }
 }
 
 export async function handleRuntimeMessage(message: RuntimeMessage): Promise<RuntimeResponse> {
@@ -41,10 +47,22 @@ export async function handleRuntimeMessage(message: RuntimeMessage): Promise<Run
   switch (message.type) {
     case 'init':
       return { ok: true, tasks: queue.getTasks(), paused: queue.isPaused() };
-    case 'enqueue':
-      return { ok: true, task: queue.enqueue(message.input) };
-    case 'enqueueBatch':
-      return { ok: true, tasks: queue.enqueueBatch(message.inputs) };
+    case 'enqueue': {
+      const task = queue.enqueue(message.input);
+      if (queue.isPaused()) {
+        queue.resume();
+        void setStorageData(PAUSED_KEY, { paused: false });
+      }
+      return { ok: true, task, paused: queue.isPaused() };
+    }
+    case 'enqueueBatch': {
+      const tasks = queue.enqueueBatch(message.inputs);
+      if (queue.isPaused()) {
+        queue.resume();
+        void setStorageData(PAUSED_KEY, { paused: false });
+      }
+      return { ok: true, tasks, paused: queue.isPaused() };
+    }
     case 'pause':
       queue.pause();
       void setStorageData(PAUSED_KEY, { paused: true });

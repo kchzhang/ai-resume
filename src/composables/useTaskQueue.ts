@@ -12,74 +12,92 @@ const STORAGE_KEY = 'ai_task_records';
 
 const tasks: Ref<TaskRecord[]> = ref([]);
 const isPaused: Ref<boolean> = ref(false);
-let initialized = false;
+let initPromise: Promise<void> | null = null;
+let listenerRegistered = false;
 
 async function refresh(): Promise<void> {
   tasks.value = await getTaskList();
 }
 
+/** 注册存储变更与开发环境广播监听器（只执行一次） */
+function registerListeners(): void {
+  if (listenerRegistered) return;
+  listenerRegistered = true;
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes[STORAGE_KEY]) void refresh();
+    });
+  }
+  if (!isProduction) {
+    window.addEventListener('message', (e: MessageEvent) => {
+      if (e.data?.channel === DEV_TASKS_CHANNEL) tasks.value = e.data.tasks;
+    });
+  }
+}
+
+/** 确保引擎已初始化；并发调用共享同一 Promise，失败时清除以允许重试 */
+async function ensureInit(): Promise<void> {
+  if (!initPromise) {
+    initPromise = (async () => {
+      registerListeners();
+      const r = await sendMessage({ type: 'init' });
+      if (r.tasks) tasks.value = r.tasks;
+      if (r.paused !== undefined) isPaused.value = r.paused;
+    })();
+  }
+  try {
+    await initPromise;
+  } catch (err) {
+    console.error('[useTaskQueue] init failed:', err);
+    initPromise = null; // 清除失败 Promise，允许后续调用重试
+    throw err;
+  }
+}
+
 /**
  * Vue 组合式封装：把 background 任务引擎的状态包成响应式 ref，方便 v-for 渲染。
- * 首次调用时自动初始化并恢复持久化任务。
+ * 所有操作先 await ensureInit() 确保引擎就绪，再下发指令。
  */
 export function useTaskQueue() {
-  if (!initialized) {
-    initialized = true;
-    // 让引擎恢复持久化任务并取回当前列表
-    sendMessage({ type: 'init' })
-      .then((r) => {
-        if (r.tasks) tasks.value = r.tasks;
-        if (r.paused !== undefined) isPaused.value = r.paused;
-      })
-      .catch((err) => {
-        console.error('[useTaskQueue] init failed:', err);
-        initialized = false; // 允许后续调用重试
-      });
-    // 订阅引擎写入的任务快照，任务推进时刷新 UI
-    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
-      // 生产环境：监听 chrome.storage.onChanged
-      chrome.storage.onChanged.addListener((changes, area) => {
-        if (area === 'local' && changes[STORAGE_KEY]) void refresh();
-      });
-    }
-    if (!isProduction) {
-      // 开发环境：监听 devBackground 广播的任务快照
-      window.addEventListener('message', (e: MessageEvent) => {
-        if (e.data?.channel === DEV_TASKS_CHANNEL) tasks.value = e.data.tasks;
-      });
-    }
-  }
-
   return {
     tasks,
     isPaused,
     enqueue: async (input: TaskInput) => {
+      await ensureInit();
       const r = await sendMessage({ type: 'enqueue', input });
+      if (r.paused !== undefined) isPaused.value = r.paused;
       await refresh();
       return r.task;
     },
     enqueueBatch: async (inputs: TaskInput[]) => {
+      await ensureInit();
       const r = await sendMessage({ type: 'enqueueBatch', inputs });
+      if (r.paused !== undefined) isPaused.value = r.paused;
       await refresh();
       return r.tasks ?? [];
     },
     pause: async () => {
+      await ensureInit();
       await sendMessage({ type: 'pause' });
       isPaused.value = true;
     },
     resume: async () => {
+      await ensureInit();
       await sendMessage({ type: 'resume' });
       isPaused.value = false;
     },
     cancel: async (id: string) => {
+      await ensureInit();
       await sendMessage({ type: 'cancel', id });
       await refresh();
     },
     remove: async (id: string) => {
+      await ensureInit();
       await sendMessage({ type: 'delete', id });
       await refresh();
     },
     rerun: async (record: TaskRecord) => {
+      await ensureInit();
       const input: TaskInput = {
         text: record.text,
         ruleId: record.ruleId,
@@ -90,13 +108,14 @@ export function useTaskQueue() {
       return r.task;
     },
     clear: async (scope?: 'all' | 'finished') => {
+      await ensureInit();
       await sendMessage({ type: 'clear', scope: scope ?? 'all' });
       await refresh();
     },
+    /** 显式重新初始化：清除旧 Promise，强制重建并等待完成 */
     init: async () => {
-      const r = await sendMessage({ type: 'init' });
-      if (r.tasks) tasks.value = r.tasks;
-      if (r.paused !== undefined) isPaused.value = r.paused;
+      initPromise = null;
+      await ensureInit();
     },
   };
 }

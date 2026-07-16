@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import Header from './Header.vue';
+import ReportFieldCard from './components/ReportFieldCard.vue';
 import { IconEye, IconRefresh, IconTrash } from '@/icons';
 import { useRouter } from 'vue-router';
 import { useTaskQueue } from '@/composables/useTaskQueue';
@@ -8,11 +9,12 @@ import type { TaskRecord, TaskStatus } from '@/types/task';
 import { getModelList } from '@/utils/modelStorage';
 
 const router = useRouter();
-const { tasks, isPaused, pause, resume, cancel, clear, rerun, remove } = useTaskQueue();
+const { tasks, isPaused, pause, resume, cancel, clear, rerun, remove, init } = useTaskQueue();
 
 const modelNameMap = ref<Record<string, string>>({});
 
 onMounted(async () => {
+  await init();
   const modelList = await getModelList();
   modelNameMap.value = modelList.reduce<Record<string, string>>((acc, m) => {
     acc[m.id] = m.name;
@@ -206,12 +208,13 @@ function goReportDetail(id: string) {
               {{ preview(t.text) }}
             </p>
 
-            <p
+            <ReportFieldCard
               v-if="t.status === 'success' && t.result"
-              class="mt-2 text-xs text-slate-700 bg-emerald-50/60 border border-emerald-100 rounded-lg p-2 leading-relaxed break-words whitespace-pre-wrap"
-            >
-              {{ preview(t.result.output, 240) }}
-            </p>
+              :summary="t.result.summary"
+              :output="t.result.output"
+              :preview-len="240"
+              class="mt-2"
+            />
 
             <p
               v-if="t.status === 'failed' && t.error"

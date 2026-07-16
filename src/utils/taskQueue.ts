@@ -56,14 +56,33 @@ export class TaskQueue {
       createdAt: now,
       updatedAt: now,
     };
-    this.tasks.unshift(task);
+    this.tasks.push(task);
     this.emit();
     this.pump();
     return task;
   }
 
+  /** 批量入队：保持传入顺序（push 而非逐个 unshift），统一 emit + pump */
   enqueueBatch(inputs: TaskInput[]): TaskRecord[] {
-    return inputs.map((i) => this.enqueue(i));
+    const created: TaskRecord[] = [];
+    for (const input of inputs) {
+      const now = Date.now();
+      const task: TaskRecord = {
+        id: generateId(),
+        text: input.text,
+        ruleId: input.ruleId,
+        ruleName: '',
+        modelId: input.modelId,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      };
+      this.tasks.push(task);
+      created.push(task);
+    }
+    this.emit();
+    this.pump();
+    return created;
   }
 
   pause(): void {

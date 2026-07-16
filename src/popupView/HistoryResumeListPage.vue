@@ -9,6 +9,7 @@ import type { MatchedResume } from '@/types/resumeMatch';
 const router = useRouter();
 const resumes = ref<MatchedResume[]>([]);
 const loading = ref(true);
+const confirmDeleteId = ref<string | null>(null);
 
 onMounted(async () => {
   resumes.value = await getMatchedResumeList();
@@ -41,11 +42,18 @@ function goDetail(id: string) {
   router.push('/history-resume-detail/' + id);
 }
 
-async function remove(id: string, event: Event) {
-  event.stopPropagation();
-  if (!window.confirm('确定删除这条历史简历吗？')) return;
+async function handleDelete(id: string) {
   await deleteMatchedResume(id);
-  resumes.value = resumes.value.filter((r) => r.id !== id);
+  confirmDeleteId.value = null;
+  resumes.value = await getMatchedResumeList();
+}
+
+function confirmDelete(id: string) {
+  confirmDeleteId.value = id;
+}
+
+function cancelDelete() {
+  confirmDeleteId.value = null;
 }
 </script>
 
@@ -94,8 +102,24 @@ async function remove(id: string, event: Event) {
                   <IconEye class="w-3.5 h-3.5" />
                   查看
                 </button>
+                <!-- 删除确认态 -->
+                <template v-if="confirmDeleteId === r.id">
+                  <span class="text-[10px] text-red-500">确认删除?</span>
+                  <button
+                    @click.stop="handleDelete(r.id)"
+                    class="inline-flex items-center justify-center w-6 h-7 rounded text-red-500 text-xs hover:bg-red-50 transition-colors"
+                    title="确认"
+                  >✓</button>
+                  <button
+                    @click.stop="cancelDelete()"
+                    class="inline-flex items-center justify-center w-6 h-7 rounded text-gray-400 text-xs hover:bg-slate-100 transition-colors"
+                    title="取消"
+                  >✕</button>
+                </template>
+                <!-- 正常态 -->
                 <button
-                  @click="remove(r.id, $event)"
+                  v-else
+                  @click.stop="confirmDelete(r.id)"
                   class="shrink-0 h-7 px-2 text-xs text-slate-500 border border-slate-200 rounded-md transition-colors duration-150 hover:bg-rose-50 hover:text-rose-500 hover:border-rose-200"
                 >
                   <IconTrash class="w-3.5 h-3.5" />

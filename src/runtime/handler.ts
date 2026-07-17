@@ -10,7 +10,7 @@ import type { RuntimeMessage, RuntimeResponse } from '@/types/runtime';
 
 const PAUSED_KEY = 'ai_queue_paused';
 
-const queue = new TaskQueue({ concurrency: 1, autoPersist: false });
+const queue = new TaskQueue({ concurrency: 2, autoPersist: false });
 let initPromise: Promise<TaskRecord[]> | null = null;
 
 async function ensureInit(): Promise<TaskRecord[]> {
@@ -27,7 +27,12 @@ async function ensureInit(): Promise<TaskRecord[]> {
       // 先恢复持久化任务，再订阅；否则 subscribe 的立即触发会把空列表写回 storage，
       // 覆盖掉 ai_task_records 中已有的任务（每次引擎重启都会清空历史）
       await queue.init();
-      queue.subscribe((list: TaskRecord[]) => void saveTaskList(list));
+      // 串行持久化：每次 emit 触发的写入排队等前一次完成后再执行，
+      // 避免 fire-and-forget 并发写入导致旧快照覆盖新快照（竞态条件）。
+      let persistPromise: Promise<void> = Promise.resolve();
+      queue.subscribe((list: TaskRecord[]) => {
+        persistPromise = persistPromise.then(() => saveTaskList(list));
+      });
       return queue.getTasks();
     })();
   }

@@ -41,6 +41,9 @@ async function ensureInit(): Promise<void> {
     initPromise = (async () => {
       registerListeners();
       const r = await sendMessage({ type: 'init' });
+      if (!r.ok) {
+        throw new Error(r.error ?? 'init failed');
+      }
       if (r.tasks) tasks.value = r.tasks;
       if (r.paused !== undefined) isPaused.value = r.paused;
     })();
@@ -65,6 +68,7 @@ export function useTaskQueue() {
     enqueue: async (input: TaskInput) => {
       await ensureInit();
       const r = await sendMessage({ type: 'enqueue', input });
+      if (!r.ok) throw new Error(r.error ?? 'enqueue failed');
       if (r.paused !== undefined) isPaused.value = r.paused;
       await refresh();
       return r.task;
@@ -72,6 +76,7 @@ export function useTaskQueue() {
     enqueueBatch: async (inputs: TaskInput[]) => {
       await ensureInit();
       const r = await sendMessage({ type: 'enqueueBatch', inputs });
+      if (!r.ok) throw new Error(r.error ?? 'enqueueBatch failed');
       if (r.paused !== undefined) isPaused.value = r.paused;
       await refresh();
       return r.tasks ?? [];

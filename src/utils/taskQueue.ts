@@ -56,13 +56,13 @@ export class TaskQueue {
       createdAt: now,
       updatedAt: now,
     };
-    this.tasks.push(task);
+    this.tasks.unshift(task);
     this.emit();
     this.pump();
     return task;
   }
 
-  /** 批量入队：保持传入顺序（push 而非逐个 unshift），统一 emit + pump */
+  /** 批量入队：保持传入顺序，整批前置插入，统一 emit + pump */
   enqueueBatch(inputs: TaskInput[]): TaskRecord[] {
     const created: TaskRecord[] = [];
     for (const input of inputs) {
@@ -77,9 +77,9 @@ export class TaskQueue {
         createdAt: now,
         updatedAt: now,
       };
-      this.tasks.push(task);
       created.push(task);
     }
+    this.tasks = [...created, ...this.tasks];
     this.emit();
     this.pump();
     return created;

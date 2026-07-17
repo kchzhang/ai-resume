@@ -156,8 +156,9 @@ function goReportDetail(id: string) {
                     ></span>
                     {{ STATUS_META[t.status].label }}
                   </span>
-                  <h3 class="text-sm font-semibold text-slate-800 truncate">
-                    {{ t.ruleName || '未命名规则' }}
+                  <h3 class="text-sm font-semibold text-slate-800 flex items-center gap-1">
+                    <span v-if="t.result?.summary?.fields?.['姓名']" class="shrink-0">{{ t.result.summary.fields['姓名'] }}</span>
+                    <span :class="t.result?.summary?.fields?.['姓名'] ? 'text-xs text-slate-500 font-normal truncate' : 'truncate'">{{ t.ruleName || '未命名规则' }}</span>
                   </h3>
                 </div>
                 <p class="mt-1 text-xs text-slate-400">

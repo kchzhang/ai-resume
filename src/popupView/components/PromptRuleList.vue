@@ -61,8 +61,10 @@ function cancelDelete() {
         <div class="block pr-16">
           <div class="flex items-center gap-2 mb-1">
             <span class="text-sm font-medium text-gray-800 truncate">{{ rule.name }}</span>
+            <span v-if="rule.jobDescription" class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium text-sky-600 bg-sky-50 rounded">JD</span>
           </div>
           <div class="text-xs text-gray-400 line-clamp-2 whitespace-pre-wrap break-words">{{ rule.rule }}</div>
+          <div v-if="rule.jobDescription" class="mt-1 text-xs text-gray-300 line-clamp-1 whitespace-pre-wrap break-words">{{ rule.jobDescription }}</div>
         </div>
 
         <!-- 操作按钮 -->
